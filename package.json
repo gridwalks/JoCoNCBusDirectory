@@ -29,7 +29,11 @@
     "prisma": "^5.7.1",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "cheerio": "^1.0.0-rc.12",
+    "puppeteer-core": "^21.6.1",
+    "@sparticuz/chromium": "^119.0.2",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
