@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  icon        String?
+  businesses  Business[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Business {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  address     String
+  city        String     @default("Smithfield")
+  state       String     @default("NC")
+  zip         String
+  phone       String?
+  email       String?
+  website     String?
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id])
+  latitude    Float?
+  longitude   Float?
+  logo        String?
+  images      String[]
+  reviews     Review[]
+  contacts    ContactSubmission[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId     String?
+  userName   String?
+  rating     Int      @db.SmallInt
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([businessId])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ContactSubmission {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  email      String
+  phone      String?
+  message    String
+  createdAt  DateTime @default(now())
+
+  @@index([businessId])
+}
+
