@@ -38,29 +38,48 @@ export const handler = async (event, context) => {
       }
     }
 
+    console.log('Login attempt for username:', username)
+
     const user = await prisma.user.findUnique({
       where: { username },
     })
 
-    if (!user || user.role !== 'admin') {
+    console.log('User found:', user ? { id: user.id, username: user.username, role: user.role } : 'NOT FOUND')
+
+    if (!user) {
+      console.log('User not found in database')
       return {
         statusCode: 401,
         headers: {
           'Access-Control-Allow-Origin': '*',
         },
-        body: JSON.stringify({ error: 'Invalid credentials' }),
+        body: JSON.stringify({ error: 'Invalid credentials - user not found' }),
       }
     }
 
-    const isValidPassword = await bcrypt.compare(password, user.password)
-
-    if (!isValidPassword) {
+    if (user.role !== 'admin') {
+      console.log('User found but role is not admin:', user.role)
       return {
         statusCode: 401,
         headers: {
           'Access-Control-Allow-Origin': '*',
         },
-        body: JSON.stringify({ error: 'Invalid credentials' }),
+        body: JSON.stringify({ error: 'Invalid credentials - not an admin user' }),
+      }
+    }
+
+    console.log('Password comparison starting...')
+    const isValidPassword = await bcrypt.compare(password, user.password)
+    console.log('Password valid:', isValidPassword)
+
+    if (!isValidPassword) {
+      console.log('Password does not match')
+      return {
+        statusCode: 401,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({ error: 'Invalid credentials - password incorrect' }),
       }
     }
 
