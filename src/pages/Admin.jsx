@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { businessesAPI, categoriesAPI, adminAPI, authAPI } from '../services/api'
+import ScrapeBusiness from '../components/ScrapeBusiness'
 
 function Admin() {
   const [authenticated, setAuthenticated] = useState(false)
@@ -56,6 +57,11 @@ function Admin() {
         handleLogout()
       }
     }
+  }
+
+  const handleBusinessScraped = (newBusiness) => {
+    // Reload businesses list when a new business is scraped
+    loadData()
   }
 
   if (!authenticated) {
@@ -143,6 +149,16 @@ function Admin() {
           }`}
         >
           Categories
+        </button>
+        <button
+          onClick={() => setActiveTab('scrape')}
+          className={`px-4 py-2 ${
+            activeTab === 'scrape'
+              ? 'border-b-2 border-primary-600 text-primary-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Scrape Business
         </button>
       </div>
 
@@ -237,6 +253,13 @@ function Admin() {
             </div>
           </div>
         </div>
+      )}
+
+      {activeTab === 'scrape' && (
+        <ScrapeBusiness 
+          categories={categories} 
+          onBusinessScraped={handleBusinessScraped}
+        />
       )}
     </div>
   )

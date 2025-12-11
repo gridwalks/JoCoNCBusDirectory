@@ -50,5 +50,9 @@ export const adminAPI = {
   getContacts: () => api.get('/admin/contacts'),
 }
 
+export const scrapeAPI = {
+  scrapeBusiness: (data) => api.post('/scrape-business', data),
+}
+
 export default api
 
