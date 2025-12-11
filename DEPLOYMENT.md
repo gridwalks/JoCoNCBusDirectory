@@ -21,9 +21,10 @@
    - Copy `.env.example` to `.env`
    - Add your Neon database connection string:
      ```
-     DATABASE_URL="postgresql://user:password@host/database?sslmode=require"
+     NETLIFY_DATABASE_URL="postgresql://user:password@host/database?sslmode=require"
      JWT_SECRET="your-secret-key-here-change-in-production"
      ```
+   - Note: For local development, you can use `DATABASE_URL` instead if preferred, but Netlify uses `NETLIFY_DATABASE_URL`
 
 3. **Set Up Database**
    ```bash
@@ -72,7 +73,7 @@
 
 4. **Add Environment Variables**
    In Netlify Dashboard → Site settings → Environment variables:
-   - `DATABASE_URL` - Your Neon PostgreSQL connection string
+   - `NETLIFY_DATABASE_URL` - Your Neon PostgreSQL connection string (automatically created if using Netlify's Neon integration)
    - `JWT_SECRET` - A secure random string (generate with: `openssl rand -base64 32`)
 
 5. **Deploy**
@@ -98,9 +99,10 @@
 
 4. **Set Environment Variables**
    ```bash
-   netlify env:set DATABASE_URL "your-neon-connection-string"
+   netlify env:set NETLIFY_DATABASE_URL "your-neon-connection-string"
    netlify env:set JWT_SECRET "your-secret-key"
    ```
+   Note: If you're using Netlify's Neon integration, `NETLIFY_DATABASE_URL` is automatically created.
 
 5. **Deploy**
    ```bash
@@ -111,16 +113,16 @@
 
 1. **Run Database Migrations**
    ```bash
-   # Set DATABASE_URL in Netlify environment, then:
+   # Set NETLIFY_DATABASE_URL in Netlify environment, then:
    netlify functions:invoke prisma-migrate
    # Or run manually:
-   DATABASE_URL="your-url" npx prisma migrate deploy
+   NETLIFY_DATABASE_URL="your-url" npx prisma migrate deploy
    ```
 
 2. **Create Admin User**
    - Use Prisma Studio or run a script:
    ```bash
-   DATABASE_URL="your-url" node -e "
+   NETLIFY_DATABASE_URL="your-url" node -e "
    const bcrypt = require('bcryptjs');
    const { PrismaClient } = require('@prisma/client');
    const prisma = new PrismaClient();
@@ -149,7 +151,8 @@
 ## Troubleshooting
 
 ### Database Connection Issues
-- Verify `DATABASE_URL` is set correctly in Netlify environment variables
+- Verify `NETLIFY_DATABASE_URL` is set correctly in Netlify environment variables
+- If using Netlify's Neon integration, `NETLIFY_DATABASE_URL` is automatically created
 - Check that your Neon database allows connections from Netlify IPs
 - Ensure SSL mode is set to `require` in connection string
 
@@ -167,7 +170,7 @@
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `DATABASE_URL` | Neon PostgreSQL connection string | Yes |
+| `NETLIFY_DATABASE_URL` | Neon PostgreSQL connection string (auto-created by Netlify Neon integration) | Yes |
 | `JWT_SECRET` | Secret key for JWT tokens | Yes |
 | `NODE_ENV` | Environment (development/production) | No |
 

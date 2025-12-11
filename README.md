@@ -50,7 +50,7 @@ cp .env.example .env
 ```
 
 Edit `.env` and add your:
-- `DATABASE_URL` - Your Neon PostgreSQL connection string
+- `NETLIFY_DATABASE_URL` - Your Neon PostgreSQL connection string (or `DATABASE_URL` for local dev)
 - `JWT_SECRET` - A secret key for JWT authentication
 
 4. Set up the database:
@@ -113,7 +113,7 @@ JoCoNCBusDirectory/
    - Publish directory: `dist`
 
 4. Add environment variables in Netlify:
-   - `DATABASE_URL` - Your Neon PostgreSQL connection string
+   - `NETLIFY_DATABASE_URL` - Your Neon PostgreSQL connection string (automatically created if using Netlify's Neon integration)
    - `JWT_SECRET` - Your JWT secret key
 
 5. Deploy!
