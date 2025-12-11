@@ -85,7 +85,10 @@ export const handler = async (event, context) => {
       headers: {
         'Access-Control-Allow-Origin': '*',
       },
-      body: JSON.stringify({ error: 'Login failed' }),
+      body: JSON.stringify({ 
+        error: 'Login failed',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      }),
     }
   } finally {
     await prisma.$disconnect()
