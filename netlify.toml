@@ -13,6 +13,3 @@
 [functions]
   node_bundler = "esbuild"
 
-[[functions.scrape-business]]
-  timeout = 26
-
