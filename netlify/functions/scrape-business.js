@@ -5,6 +5,7 @@ import { checkDuplicate } from './utils/duplicate-check.js'
 import { scrapeGoogleBusiness, isGoogleUrl } from './utils/scrapers/google.js'
 import { scrapeYelpBusiness, isYelpUrl } from './utils/scrapers/yelp.js'
 import { scrapeGeneralWebsite } from './utils/scrapers/general.js'
+import { scrapeDirectoryListing, isDirectoryListing } from './utils/scrapers/directory.js'
 
 const prisma = new PrismaClient()
 
@@ -25,6 +26,7 @@ function verifyToken(event) {
 function detectSource(url) {
   if (isGoogleUrl(url)) return 'google'
   if (isYelpUrl(url)) return 'yelp'
+  if (isDirectoryListing(url)) return 'directory'
   return 'general'
 }
 
@@ -36,6 +38,8 @@ async function scrapeBusinessData(url, source) {
       return await scrapeGoogleBusiness(url)
     case 'yelp':
       return await scrapeYelpBusiness(url)
+    case 'directory':
+      return await scrapeDirectoryListing(url)
     case 'general':
       return await scrapeGeneralWebsite(url)
     default:
@@ -212,18 +216,30 @@ export const handler = async (event, context) => {
     }
   } catch (error) {
     console.error('Scraping error:', error)
+    console.error('Error stack:', error.stack)
+    
+    // Return more detailed error information
+    const errorMessage = error.message || 'Unknown error occurred'
+    const statusCode = error.statusCode || 500
+    
     return {
-      statusCode: 500,
+      statusCode,
       headers: {
+        'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       },
       body: JSON.stringify({ 
         error: 'Failed to scrape business',
-        message: error.message 
+        message: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       }),
     }
   } finally {
-    await prisma.$disconnect()
+    try {
+      await prisma.$disconnect()
+    } catch (disconnectError) {
+      console.error('Error disconnecting Prisma:', disconnectError)
+    }
   }
 }
 
