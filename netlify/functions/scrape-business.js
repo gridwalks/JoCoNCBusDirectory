@@ -33,17 +33,28 @@ function detectSource(url) {
 async function scrapeBusinessData(url, source) {
   const detectedSource = source || detectSource(url)
   
-  switch (detectedSource) {
-    case 'google':
-      return await scrapeGoogleBusiness(url)
-    case 'yelp':
-      return await scrapeYelpBusiness(url)
-    case 'directory':
-      return await scrapeDirectoryListing(url)
-    case 'general':
-      return await scrapeGeneralWebsite(url)
-    default:
-      throw new Error(`Unknown source: ${detectedSource}`)
+  try {
+    switch (detectedSource) {
+      case 'google':
+        return await scrapeGoogleBusiness(url)
+      case 'yelp':
+        return await scrapeYelpBusiness(url)
+      case 'directory':
+        try {
+          return await scrapeDirectoryListing(url)
+        } catch (directoryError) {
+          console.warn('Directory scraper failed, falling back to general scraper:', directoryError.message)
+          // Fallback to general scraper if directory scraper fails
+          return await scrapeGeneralWebsite(url)
+        }
+      case 'general':
+        return await scrapeGeneralWebsite(url)
+      default:
+        throw new Error(`Unknown source: ${detectedSource}`)
+    }
+  } catch (error) {
+    console.error(`Error scraping ${detectedSource} URL:`, error)
+    throw error
   }
 }
 
