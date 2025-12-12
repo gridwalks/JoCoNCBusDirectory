@@ -30,6 +30,8 @@ export const businessesAPI = {
 export const categoriesAPI = {
   getAll: () => api.get('/categories'),
   create: (data) => api.post('/admin/categories', data),
+  update: (id, data) => api.put(`/admin/categories?id=${id}`, data),
+  delete: (id) => api.delete(`/admin/categories?id=${id}`),
 }
 
 export const reviewsAPI = {
