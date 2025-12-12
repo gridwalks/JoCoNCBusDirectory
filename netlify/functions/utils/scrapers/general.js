@@ -13,15 +13,23 @@ export async function scrapeGeneralWebsite(url) {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 25000) // 25 second timeout
 
-    const response = await fetch(fullUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      },
-      signal: controller.signal
-    })
-
-    clearTimeout(timeoutId)
+    let response
+    try {
+      response = await fetch(fullUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        signal: controller.signal
+      })
+      clearTimeout(timeoutId)
+    } catch (fetchError) {
+      clearTimeout(timeoutId)
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Request timed out while fetching the website')
+      }
+      throw fetchError
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.status}`)

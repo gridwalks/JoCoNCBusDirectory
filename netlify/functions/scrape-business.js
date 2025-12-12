@@ -48,197 +48,217 @@ async function scrapeBusinessData(url, source) {
 }
 
 export const handler = async (event, context) => {
-  // Handle CORS preflight
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      },
-      body: '',
-    }
-  }
-
-  // Only allow POST
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-      },
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    }
-  }
-
-  // Verify admin authentication
-  const user = verifyToken(event)
-  if (!user || user.role !== 'admin') {
-    return {
-      statusCode: 401,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-      },
-      body: JSON.stringify({ error: 'Unauthorized' }),
-    }
-  }
-
+  // Wrap everything in try-catch to catch any initialization errors
   try {
-    const body = JSON.parse(event.body || '{}')
-    const { url, source, categoryId, saveToDatabase = false } = body
-
-    if (!url) {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
       return {
-        statusCode: 400,
+        statusCode: 200,
         headers: {
           'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
         },
-        body: JSON.stringify({ error: 'URL is required' }),
+        body: '',
       }
     }
 
-    // Validate URL format
+    // Only allow POST
+    if (event.httpMethod !== 'POST') {
+      return {
+        statusCode: 405,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({ error: 'Method not allowed' }),
+      }
+    }
+
+    // Verify admin authentication
+    const user = verifyToken(event)
+    if (!user || user.role !== 'admin') {
+      return {
+        statusCode: 401,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({ error: 'Unauthorized' }),
+      }
+    }
+
     try {
-      new URL(url.startsWith('http') ? url : `https://${url}`)
-    } catch {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-        },
-        body: JSON.stringify({ error: 'Invalid URL format' }),
-      }
-    }
+      const body = JSON.parse(event.body || '{}')
+      const { url, source, categoryId, saveToDatabase = false } = body
 
-    // Scrape business data
-    const scrapedData = await scrapeBusinessData(url, source)
-
-    // Parse address into components
-    const addressParts = parseAddress(scrapedData.address)
-    
-    // Geocode address
-    let coordinates = null
-    if (scrapedData.address) {
-      coordinates = await geocodeAddress(scrapedData.address)
-    }
-
-    // Check for duplicates (pass prisma instance to avoid connection issues)
-    const duplicate = await checkDuplicate({
-      name: scrapedData.name,
-      address: scrapedData.address,
-      website: scrapedData.website,
-      phone: scrapedData.phone
-    }, prisma)
-
-    // Prepare business data
-    const businessData = {
-      name: scrapedData.name,
-      description: scrapedData.description || '',
-      address: addressParts.address || scrapedData.address || '',
-      city: addressParts.city || 'Smithfield',
-      state: addressParts.state || 'NC',
-      zip: addressParts.zip || '',
-      phone: scrapedData.phone || null,
-      email: scrapedData.email || null,
-      website: scrapedData.website || null,
-      categoryId: categoryId || null,
-      latitude: coordinates?.latitude || null,
-      longitude: coordinates?.longitude || null,
-      images: scrapedData.images || []
-    }
-
-    // If saveToDatabase is true and no duplicate found, save to database
-    let savedBusiness = null
-    if (saveToDatabase && !duplicate) {
-      // Validate required fields
-      if (!businessData.name || !businessData.address) {
+      if (!url) {
         return {
           statusCode: 400,
           headers: {
             'Access-Control-Allow-Origin': '*',
           },
-          body: JSON.stringify({ 
-            error: 'Missing required fields: name and address are required',
-            scrapedData: businessData,
-            duplicate
-          }),
+          body: JSON.stringify({ error: 'URL is required' }),
         }
       }
 
-      // Get default category if none provided
-      if (!businessData.categoryId) {
-        const defaultCategory = await prisma.category.findFirst({
-          orderBy: { name: 'asc' }
-        })
-        if (defaultCategory) {
-          businessData.categoryId = defaultCategory.id
-        } else {
+      // Validate URL format
+      try {
+        new URL(url.startsWith('http') ? url : `https://${url}`)
+      } catch {
+        return {
+          statusCode: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+          },
+          body: JSON.stringify({ error: 'Invalid URL format' }),
+        }
+      }
+
+      // Scrape business data
+      const scrapedData = await scrapeBusinessData(url, source)
+
+      // Parse address into components
+      const addressParts = parseAddress(scrapedData.address)
+      
+      // Geocode address
+      let coordinates = null
+      if (scrapedData.address) {
+        coordinates = await geocodeAddress(scrapedData.address)
+      }
+
+      // Check for duplicates (pass prisma instance to avoid connection issues)
+      const duplicate = await checkDuplicate({
+        name: scrapedData.name,
+        address: scrapedData.address,
+        website: scrapedData.website,
+        phone: scrapedData.phone
+      }, prisma)
+
+      // Prepare business data
+      const businessData = {
+        name: scrapedData.name,
+        description: scrapedData.description || '',
+        address: addressParts.address || scrapedData.address || '',
+        city: addressParts.city || 'Smithfield',
+        state: addressParts.state || 'NC',
+        zip: addressParts.zip || '',
+        phone: scrapedData.phone || null,
+        email: scrapedData.email || null,
+        website: scrapedData.website || null,
+        categoryId: categoryId || null,
+        latitude: coordinates?.latitude || null,
+        longitude: coordinates?.longitude || null,
+        images: scrapedData.images || []
+      }
+
+      // If saveToDatabase is true and no duplicate found, save to database
+      let savedBusiness = null
+      if (saveToDatabase && !duplicate) {
+        // Validate required fields
+        if (!businessData.name || !businessData.address) {
           return {
             statusCode: 400,
             headers: {
               'Access-Control-Allow-Origin': '*',
             },
             body: JSON.stringify({ 
-              error: 'No category provided and no default category found',
-              scrapedData: businessData
+              error: 'Missing required fields: name and address are required',
+              scrapedData: businessData,
+              duplicate
             }),
           }
         }
+
+        // Get default category if none provided
+        if (!businessData.categoryId) {
+          const defaultCategory = await prisma.category.findFirst({
+            orderBy: { name: 'asc' }
+          })
+          if (defaultCategory) {
+            businessData.categoryId = defaultCategory.id
+          } else {
+            return {
+              statusCode: 400,
+              headers: {
+                'Access-Control-Allow-Origin': '*',
+              },
+              body: JSON.stringify({ 
+                error: 'No category provided and no default category found',
+                scrapedData: businessData
+              }),
+            }
+          }
+        }
+
+        // Create business
+        savedBusiness = await prisma.business.create({
+          data: businessData,
+          include: {
+            category: true
+          }
+        })
       }
 
-      // Create business
-      savedBusiness = await prisma.business.create({
-        data: businessData,
-        include: {
-          category: true
-        }
-      })
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          success: true,
+          scrapedData: businessData,
+          duplicate: duplicate ? {
+            match: duplicate.match,
+            business: duplicate.business
+          } : null,
+          savedBusiness,
+          source: source || detectSource(url),
+          geocoded: coordinates !== null
+        }),
+      }
+    } catch (error) {
+      console.error('Scraping error:', error)
+      console.error('Error stack:', error.stack)
+      
+      // Return more detailed error information
+      const errorMessage = error.message || 'Unknown error occurred'
+      const statusCode = error.statusCode || 500
+      
+      return {
+        statusCode,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({ 
+          error: 'Failed to scrape business',
+          message: errorMessage,
+          details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }),
+      }
+    } finally {
+      try {
+        await prisma.$disconnect()
+      } catch (disconnectError) {
+        console.error('Error disconnecting Prisma:', disconnectError)
+      }
     }
-
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-      body: JSON.stringify({
-        success: true,
-        scrapedData: businessData,
-        duplicate: duplicate ? {
-          match: duplicate.match,
-          business: duplicate.business
-        } : null,
-        savedBusiness,
-        source: source || detectSource(url),
-        geocoded: coordinates !== null
-      }),
-    }
-  } catch (error) {
-    console.error('Scraping error:', error)
-    console.error('Error stack:', error.stack)
-    
-    // Return more detailed error information
-    const errorMessage = error.message || 'Unknown error occurred'
-    const statusCode = error.statusCode || 500
+  } catch (outerError) {
+    // Catch any errors during initialization or handler setup
+    console.error('Handler initialization error:', outerError)
+    console.error('Error stack:', outerError.stack)
     
     return {
-      statusCode,
+      statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       },
       body: JSON.stringify({ 
-        error: 'Failed to scrape business',
-        message: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error: 'Function initialization error',
+        message: outerError.message || 'Unknown error occurred',
+        type: outerError.name || 'Error'
       }),
-    }
-  } finally {
-    try {
-      await prisma.$disconnect()
-    } catch (disconnectError) {
-      console.error('Error disconnecting Prisma:', disconnectError)
     }
   }
 }
