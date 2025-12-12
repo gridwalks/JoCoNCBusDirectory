@@ -6,13 +6,14 @@
 DELETE FROM "User" WHERE "username" = 'admin';
 
 -- Create admin user with correct password hash for 'admin123'
+-- This hash was generated fresh: $2a$10$iwL3PlvgL4Z4.9bc3Yh.keUVkO7/qQ6cp6FSuerUzuM7GUW1Bi8.W
 INSERT INTO "User" ("id", "username", "email", "password", "role", "createdAt", "updatedAt")
 VALUES 
     (
         'admin-' || gen_random_uuid()::text,
         'admin',
         'admin@jocobusiness.com',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$iwL3PlvgL4Z4.9bc3Yh.keUVkO7/qQ6cp6FSuerUzuM7GUW1Bi8.W',
         'admin',
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP

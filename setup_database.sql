@@ -87,14 +87,14 @@ ON CONFLICT ("id") DO NOTHING;
 
 -- Create admin user (password: admin123)
 -- Password hash for 'admin123' using bcrypt (10 rounds)
--- This is a valid bcrypt hash for password: admin123
+-- Generated fresh: $2a$10$iwL3PlvgL4Z4.9bc3Yh.keUVkO7/qQ6cp6FSuerUzuM7GUW1Bi8.W
 INSERT INTO "User" ("id", "username", "email", "password", "role", "createdAt", "updatedAt")
 VALUES 
     (
         'admin-' || gen_random_uuid()::text,
         'admin',
         'admin@jocobusiness.com',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$iwL3PlvgL4Z4.9bc3Yh.keUVkO7/qQ6cp6FSuerUzuM7GUW1Bi8.W',
         'admin',
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
