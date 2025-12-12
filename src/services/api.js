@@ -22,16 +22,16 @@ export const businessesAPI = {
   getAll: (params) => api.get('/businesses', { params }),
   getById: (id) => api.get(`/business-detail?id=${id}`),
   search: (query) => api.get(`/business-search?q=${encodeURIComponent(query)}`),
-  create: (data) => api.post('/admin/businesses', data),
-  update: (id, data) => api.put(`/admin/businesses?id=${id}`, data),
-  delete: (id) => api.delete(`/admin/businesses?id=${id}`),
+  create: (data) => api.post('/admin-businesses', data),
+  update: (id, data) => api.put(`/admin-businesses?id=${id}`, data),
+  delete: (id) => api.delete(`/admin-businesses?id=${id}`),
 }
 
 export const categoriesAPI = {
   getAll: () => api.get('/categories'),
-  create: (data) => api.post('/admin/categories', data),
-  update: (id, data) => api.put(`/admin/categories?id=${id}`, data),
-  delete: (id) => api.delete(`/admin/categories?id=${id}`),
+  create: (data) => api.post('/admin-categories', data),
+  update: (id, data) => api.put(`/admin-categories?id=${id}`, data),
+  delete: (id) => api.delete(`/admin-categories?id=${id}`),
 }
 
 export const reviewsAPI = {
@@ -48,8 +48,8 @@ export const authAPI = {
 }
 
 export const adminAPI = {
-  getStats: () => api.get('/admin/stats'),
-  getContacts: () => api.get('/admin/contacts'),
+  getStats: () => api.get('/admin-stats'),
+  getContacts: () => api.get('/admin-contacts'),
 }
 
 export const scrapeAPI = {
