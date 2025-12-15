@@ -18,3 +18,9 @@
 
 [functions.scrape-business]
   timeout = 30
+
+[functions.scrape-directories]
+  timeout = 30
+
+[functions.scrape-directories-scheduled]
+  timeout = 30

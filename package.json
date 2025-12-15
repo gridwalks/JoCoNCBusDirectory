@@ -23,6 +23,7 @@
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.0.0-rc.12",
+    "groq-sdk": "^0.7.0",
     "jsonwebtoken": "^9.0.2",
     "leaflet": "^1.9.4",
     "node-fetch": "^3.3.2",

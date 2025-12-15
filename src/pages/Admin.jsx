@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { businessesAPI, categoriesAPI, adminAPI, authAPI } from '../services/api'
 import ScrapeBusiness from '../components/ScrapeBusiness'
+import BulkScrapeDirectories from '../components/BulkScrapeDirectories'
 
 function CategoryForm({ onSuccess, onCancel, initialData }) {
   const [name, setName] = useState(initialData?.name || '')
@@ -274,6 +275,16 @@ function Admin() {
         >
           Scrape Business
         </button>
+        <button
+          onClick={() => setActiveTab('bulk-scrape')}
+          className={`px-4 py-2 ${
+            activeTab === 'bulk-scrape'
+              ? 'border-b-2 border-primary-600 text-primary-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Bulk Scrape
+        </button>
       </div>
 
       {activeTab === 'dashboard' && stats && (
@@ -413,6 +424,13 @@ function Admin() {
         <ScrapeBusiness 
           categories={categories} 
           onBusinessScraped={handleBusinessScraped}
+        />
+      )}
+
+      {activeTab === 'bulk-scrape' && (
+        <BulkScrapeDirectories 
+          categories={categories} 
+          onBusinessesScraped={handleBusinessScraped}
         />
       )}
     </div>

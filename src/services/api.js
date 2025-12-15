@@ -54,6 +54,7 @@ export const adminAPI = {
 
 export const scrapeAPI = {
   scrapeBusiness: (data) => api.post('/scrape-business', data),
+  scrapeDirectories: (data) => api.post('/scrape-directories', data),
 }
 
 export default api
