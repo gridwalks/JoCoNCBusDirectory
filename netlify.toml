@@ -1,26 +1,20 @@
-[build]
-  command = "npm run build"
-  publish = "dist"
-  functions = "netlify/functions"
+﻿[build]
+command = "npm run build"
+publish = "dist"
+functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18"
+NODE_VERSION = "18"
 
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+from = "/api/*"
+to = "/.netlify/functions/:splat"
+status = 200
 
 [functions]
-  node_bundler = "esbuild"
-  directory = "netlify/functions"
-  timeout = 30
+node_bundler = "esbuild"
+directory = "netlify/functions"
+timeout = 30
 
 [functions.scrape-business]
-  timeout = 30
-
-[functions.scrape-directories]
-  timeout = 30
-
-[functions.scrape-directories-scheduled]
-  timeout = 30
+timeout = 30
