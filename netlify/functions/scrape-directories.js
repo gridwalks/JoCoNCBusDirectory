@@ -128,32 +128,69 @@ async function fetchHtml(url) {
         throw new Error(`Failed to load browser dependencies: ${importError.message}`)
       }
       
-      // Get Chromium executable path with timeout
+      // Get Chromium executable path with timeout and better error handling
       let executablePath
       try {
+        // Try to get the executable path
+        // Note: @sparticuz/chromium should handle the path automatically
         executablePath = await Promise.race([
           chromium.executablePath(),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Chromium executable path timeout')), 10000)
           )
         ])
-        console.log('Chromium executable path obtained')
+        console.log('Chromium executable path obtained:', executablePath)
+        
+        // Verify the path exists (basic check)
+        if (!executablePath || executablePath.includes('does not exist')) {
+          throw new Error('Chromium executable path is invalid')
+        }
       } catch (chromiumError) {
-        console.error('Failed to get Chromium executable path:', chromiumError)
-        throw new Error(`Chromium initialization failed: ${chromiumError.message}`)
+        console.error('Failed to get Chromium executable path:', chromiumError.message)
+        console.error('Full error:', chromiumError)
+        
+        // Try alternative: let Puppeteer find Chromium itself
+        console.log('Attempting to use Puppeteer without explicit Chromium path...')
+        executablePath = null // Will let Puppeteer try to find it
       }
       
       console.log('Launching browser...')
-      browser = await Promise.race([
-        puppeteer.launch({
-          args: chromium.args,
-          executablePath: executablePath,
-          headless: chromium.headless,
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Browser launch timeout')), 15000)
+      const launchOptions = {
+        args: chromium.args || [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu'
+        ],
+        headless: chromium.headless !== false,
+      }
+      
+      // Only set executablePath if we have a valid one
+      if (executablePath) {
+        launchOptions.executablePath = executablePath
+      } else {
+        console.warn('Launching without explicit executablePath - Puppeteer will try to find Chromium')
+      }
+      
+      try {
+        browser = await Promise.race([
+          puppeteer.launch(launchOptions),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Browser launch timeout')), 20000)
+          )
+        ])
+        console.log('Browser launched successfully')
+      } catch (launchError) {
+        console.error('Browser launch failed:', launchError)
+        throw new Error(
+          `Failed to launch browser. JavaScript-rendered pages require Puppeteer/Chromium, ` +
+          `but it's not available in this environment. Error: ${launchError.message}`
         )
-      ])
+      }
       
       console.log('Browser launched, creating page...')
       const page = await browser.newPage()
