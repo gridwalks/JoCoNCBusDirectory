@@ -60,6 +60,81 @@ function isPlaceholderContent(html) {
 }
 
 /**
+ * Fetch HTML using external browser service API (fallback when Puppeteer unavailable)
+ */
+async function fetchHtmlWithBrowserService(url) {
+  // Option 1: Try ScrapingBee API if configured
+  if (process.env.SCRAPINGBEE_API_KEY) {
+    try {
+      console.log('Trying ScrapingBee API...')
+      const scrapingBeeUrl = `https://app.scrapingbee.com/api/v1/?api_key=${process.env.SCRAPINGBEE_API_KEY}&url=${encodeURIComponent(url)}&render_js=true`
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      const response = await fetch(scrapingBeeUrl, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      if (response.ok) {
+        const html = await response.text()
+        console.log('ScrapingBee API successful, HTML length:', html.length)
+        return html
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.log('ScrapingBee API failed:', error.message)
+      }
+    }
+  }
+  
+  // Option 2: Try Browserless API if configured
+  if (process.env.BROWSERLESS_API_KEY) {
+    try {
+      console.log('Trying Browserless API...')
+      const browserlessUrl = process.env.BROWSERLESS_URL || 'https://chrome.browserless.io'
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      const response = await fetch(`${browserlessUrl}/content?token=${process.env.BROWSERLESS_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+        signal: controller.signal
+      })
+      clearTimeout(timeoutId)
+      if (response.ok) {
+        const html = await response.text()
+        console.log('Browserless API successful, HTML length:', html.length)
+        return html
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.log('Browserless API failed:', error.message)
+      }
+    }
+  }
+  
+  // Option 3: Try ScraperAPI if configured
+  if (process.env.SCRAPERAPI_KEY) {
+    try {
+      console.log('Trying ScraperAPI...')
+      const scraperApiUrl = `http://api.scraperapi.com?api_key=${process.env.SCRAPERAPI_KEY}&url=${encodeURIComponent(url)}&render=true`
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      const response = await fetch(scraperApiUrl, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      if (response.ok) {
+        const html = await response.text()
+        console.log('ScraperAPI successful, HTML length:', html.length)
+        return html
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.log('ScraperAPI failed:', error.message)
+      }
+    }
+  }
+  
+  return null
+}
+
+/**
  * Fetch HTML content from URL
  */
 async function fetchHtml(url) {
@@ -94,16 +169,16 @@ async function fetchHtml(url) {
         console.log('Regular fetch successful, got actual content')
         return html
       } else {
-        console.log('Regular fetch returned placeholder content, will try Puppeteer')
-        usePuppeteer = true // Switch to Puppeteer
+        console.log('Regular fetch returned placeholder content, will try browser automation')
+        usePuppeteer = true // Switch to browser automation
       }
     } catch (fetchError) {
       if (fetchError.name === 'AbortError') {
-        console.log('Regular fetch timed out, will try Puppeteer')
+        console.log('Regular fetch timed out, will try browser automation')
       } else {
-        console.log('Regular fetch failed, will try Puppeteer:', fetchError.message)
+        console.log('Regular fetch failed, will try browser automation:', fetchError.message)
       }
-      usePuppeteer = true // Switch to Puppeteer
+      usePuppeteer = true // Switch to browser automation
     }
   }
   
@@ -216,8 +291,37 @@ async function fetchHtml(url) {
           console.error('Error closing browser:', closeError)
         }
       }
-      throw new Error(`Failed to fetch with Puppeteer: ${error.message}`)
+      
+      // Try external browser service as fallback
+      console.log('Puppeteer failed, trying external browser service...')
+      const fallbackHtml = await fetchHtmlWithBrowserService(fullUrl)
+      if (fallbackHtml) {
+        console.log('External browser service successful')
+        return fallbackHtml
+      }
+      
+      throw new Error(
+        `Failed to fetch JavaScript-rendered page. ` +
+        `Puppeteer is not available in this environment, and no external browser service is configured. ` +
+        `Please configure SCRAPINGBEE_API_KEY, BROWSERLESS_API_KEY, or SCRAPERAPI_KEY environment variable, ` +
+        `or use a static directory page. Error: ${error.message}`
+      )
     }
+  }
+  
+  // If we get here and usePuppeteer is true but Puppeteer wasn't attempted,
+  // try external browser service
+  if (usePuppeteer) {
+    console.log('Trying external browser service as primary method...')
+    const serviceHtml = await fetchHtmlWithBrowserService(fullUrl)
+    if (serviceHtml) {
+      return serviceHtml
+    }
+    throw new Error(
+      `This page requires JavaScript rendering, but browser automation is not available. ` +
+      `Please configure an external browser service (SCRAPINGBEE_API_KEY, BROWSERLESS_API_KEY, or SCRAPERAPI_KEY) ` +
+      `or use a static directory page.`
+    )
   }
 }
 
