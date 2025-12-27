@@ -1,29 +1,37 @@
 import { PrismaClient } from '@prisma/client'
 
-// The Prisma schema uses env("NETLIFY_DATABASE_URL")
-// Prisma Client will automatically read from NETLIFY_DATABASE_URL at runtime
-// However, we also set DATABASE_URL as a fallback for compatibility
+// Ensure DATABASE_URL is set from NETLIFY_DATABASE_URL if needed
+// Prisma schema uses env("NETLIFY_DATABASE_URL"), but Prisma Client also checks DATABASE_URL
 if (process.env.NETLIFY_DATABASE_URL && !process.env.DATABASE_URL) {
   process.env.DATABASE_URL = process.env.NETLIFY_DATABASE_URL
 }
 
-// Verify that we have a database URL
-const hasDbUrl = !!(process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL)
-if (!hasDbUrl) {
+// Get the database URL
+const dbUrl = process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL
+
+if (!dbUrl) {
   console.error('ERROR: NETLIFY_DATABASE_URL environment variable is not set!')
   console.error('Please set NETLIFY_DATABASE_URL in your Netlify environment variables.')
-  // Only log available env vars in development
-  if (process.env.NODE_ENV === 'development') {
-    console.error('Available env vars:', Object.keys(process.env).filter(k => k.includes('DATABASE') || k.includes('DB')))
+  console.error('This will cause database connection errors.')
+}
+
+// Create Prisma client
+// Prisma will read NETLIFY_DATABASE_URL from the schema, but we also set it explicitly
+// in datasources to ensure it's used correctly
+const prismaConfig = {
+  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+}
+
+// Only set datasource URL if we have one (prevents errors during module load)
+if (dbUrl) {
+  prismaConfig.datasources = {
+    db: {
+      url: dbUrl,
+    },
   }
 }
 
-// Create Prisma client instance
-// Note: In serverless, each function invocation may get a new instance
-// but we use a singleton pattern to reuse connections within the same invocation
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-})
+const prisma = new PrismaClient(prismaConfig)
 
 export default prisma
 
