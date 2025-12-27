@@ -57,6 +57,16 @@ export const handler = async (event, context) => {
     }
   } catch (error) {
     console.error('Error fetching businesses:', error)
+    console.error('Error stack:', error.stack)
+    console.error('Error name:', error.name)
+    console.error('Error code:', error.code)
+    
+    // Check if it's a database connection error
+    const isConnectionError = error.code === 'P1001' || 
+                              error.code === 'P1000' || 
+                              error.message?.includes('connection') ||
+                              error.message?.includes('connect')
+    
     return {
       statusCode: 500,
       headers: {
@@ -65,11 +75,19 @@ export const handler = async (event, context) => {
       },
       body: JSON.stringify({ 
         error: 'Failed to fetch businesses',
-        message: error.message 
+        message: error.message,
+        code: error.code,
+        isConnectionError,
+        // Only include detailed error in development
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
       }),
     }
   } finally {
-    await prisma.$disconnect()
+    try {
+      await prisma.$disconnect()
+    } catch (disconnectError) {
+      console.error('Error disconnecting Prisma:', disconnectError)
+    }
   }
 }
 
