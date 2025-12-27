@@ -3,8 +3,9 @@ import jwt from 'jsonwebtoken'
 import Groq from 'groq-sdk'
 import * as cheerio from 'cheerio'
 import fetch from 'node-fetch'
-import chromium from '@sparticuz/chromium'
-import puppeteer from 'puppeteer-core'
+// Lazy load Chromium and Puppeteer only when needed
+// import chromium from '@sparticuz/chromium'
+// import puppeteer from 'puppeteer-core'
 import { geocodeAddress, parseAddress } from './utils/geocode.js'
 import { checkDuplicate } from './utils/duplicate-check.js'
 
@@ -43,21 +44,67 @@ async function fetchHtml(url) {
   
   if (needsPuppeteer(fullUrl)) {
     // Use Puppeteer for dynamic/JS-rendered pages
+    // Lazy load Chromium and Puppeteer only when needed
     let browser = null
     try {
-      browser = await puppeteer.launch({
-        args: chromium.args,
-        executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
-      })
+      console.log('Initializing Puppeteer for:', fullUrl)
       
+      // Dynamically import Chromium and Puppeteer
+      let chromium, puppeteer
+      try {
+        const chromiumModule = await import('@sparticuz/chromium')
+        chromium = chromiumModule.default || chromiumModule
+        const puppeteerModule = await import('puppeteer-core')
+        puppeteer = puppeteerModule.default || puppeteerModule
+        console.log('Chromium and Puppeteer modules loaded')
+      } catch (importError) {
+        console.error('Failed to import Chromium/Puppeteer:', importError)
+        throw new Error(`Failed to load browser dependencies: ${importError.message}`)
+      }
+      
+      // Get Chromium executable path with timeout
+      let executablePath
+      try {
+        executablePath = await Promise.race([
+          chromium.executablePath(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Chromium executable path timeout')), 10000)
+          )
+        ])
+        console.log('Chromium executable path obtained')
+      } catch (chromiumError) {
+        console.error('Failed to get Chromium executable path:', chromiumError)
+        throw new Error(`Chromium initialization failed: ${chromiumError.message}`)
+      }
+      
+      console.log('Launching browser...')
+      browser = await Promise.race([
+        puppeteer.launch({
+          args: chromium.args,
+          executablePath: executablePath,
+          headless: chromium.headless,
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Browser launch timeout')), 15000)
+        )
+      ])
+      
+      console.log('Browser launched, creating page...')
       const page = await browser.newPage()
-      await page.goto(fullUrl, { waitUntil: 'networkidle2', timeout: 20000 })
+      
+      console.log('Navigating to URL...')
+      await page.goto(fullUrl, { waitUntil: 'networkidle2', timeout: 15000 })
+      
+      console.log('Extracting HTML...')
       const html = await page.content()
+      
+      console.log('Closing browser...')
       await browser.close()
       browser = null
+      
       return html
     } catch (error) {
+      console.error('Puppeteer error:', error)
       if (browser) {
         try {
           await browser.close()
@@ -65,7 +112,26 @@ async function fetchHtml(url) {
           console.error('Error closing browser:', closeError)
         }
       }
-      throw new Error(`Failed to fetch with Puppeteer: ${error.message}`)
+      // If Puppeteer fails, try to fall back to fetch (won't work for JS pages, but better than nothing)
+      console.warn('Puppeteer failed, attempting fallback to fetch:', error.message)
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000)
+        const response = await fetch(fullUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          },
+          signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        return await response.text()
+      } catch (fallbackError) {
+        throw new Error(`Failed to fetch with Puppeteer: ${error.message}. Fallback also failed: ${fallbackError.message}`)
+      }
     }
   } else {
     // Use Cheerio for static pages
@@ -262,12 +328,36 @@ async function processBusiness(businessData, defaultCategoryId, url) {
 }
 
 export const handler = async (event, context) => {
-  const startTime = Date.now()
+  // Log function start for debugging
+  console.log('=== scrape-directories handler started ===')
+  console.log('Method:', event.httpMethod)
+  console.log('Has body:', !!event.body)
+  
+  // Catch any errors during handler initialization
+  let startTime
+  try {
+    startTime = Date.now()
+  } catch (initError) {
+    console.error('Error initializing handler:', initError)
+    return {
+      statusCode: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        error: 'Handler initialization error',
+        message: initError.message || 'Unknown initialization error',
+      }),
+    }
+  }
+
   // Netlify functions timeout is 60 seconds, but we'll use 55 seconds as a safety margin
   const MAX_EXECUTION_TIME = 55000 // 55 seconds in milliseconds
   const TIME_BUFFER = 5000 // 5 seconds buffer before timeout
 
   try {
+    console.log('Handler started, method:', event.httpMethod)
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
       return {
@@ -305,8 +395,23 @@ export const handler = async (event, context) => {
     }
 
     try {
-      const body = JSON.parse(event.body || '{}')
+      console.log('Parsing request body...')
+      let body
+      try {
+        body = JSON.parse(event.body || '{}')
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError)
+        return {
+          statusCode: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+          },
+          body: JSON.stringify({ error: 'Invalid JSON in request body', message: parseError.message }),
+        }
+      }
+
       const { urls, categoryId } = body
+      console.log('URLs received:', urls?.length || 0)
 
       if (!urls || !Array.isArray(urls) || urls.length === 0) {
         return {
@@ -319,21 +424,34 @@ export const handler = async (event, context) => {
       }
 
       // Get default category if not provided
+      console.log('Getting category...')
       let defaultCategoryId = categoryId
       if (!defaultCategoryId) {
-        const defaultCategory = await prisma.category.findFirst({
-          orderBy: { name: 'asc' }
-        })
-        if (!defaultCategory) {
+        try {
+          const defaultCategory = await prisma.category.findFirst({
+            orderBy: { name: 'asc' }
+          })
+          if (!defaultCategory) {
+            return {
+              statusCode: 400,
+              headers: {
+                'Access-Control-Allow-Origin': '*',
+              },
+              body: JSON.stringify({ error: 'No category provided and no default category found' }),
+            }
+          }
+          defaultCategoryId = defaultCategory.id
+          console.log('Using default category:', defaultCategoryId)
+        } catch (dbError) {
+          console.error('Database error getting category:', dbError)
           return {
-            statusCode: 400,
+            statusCode: 500,
             headers: {
               'Access-Control-Allow-Origin': '*',
             },
-            body: JSON.stringify({ error: 'No category provided and no default category found' }),
+            body: JSON.stringify({ error: 'Database error', message: dbError.message }),
           }
         }
-        defaultCategoryId = defaultCategory.id
       }
 
       const results = {
@@ -381,7 +499,14 @@ export const handler = async (event, context) => {
           console.log(`Processing URL ${i + 1}/${urls.length}: ${url}`)
           
           // Fetch HTML with timeout protection
-          const html = await fetchHtml(url)
+          let html
+          try {
+            html = await fetchHtml(url)
+            console.log(`Successfully fetched HTML for ${url}, length: ${html?.length || 0}`)
+          } catch (fetchError) {
+            console.error(`Failed to fetch HTML for ${url}:`, fetchError)
+            throw fetchError
+          }
           
           // Check time again after fetching
           if (!checkTimeRemaining()) {
@@ -397,7 +522,15 @@ export const handler = async (event, context) => {
           }
           
           // Extract businesses with Groq
-          const businesses = await extractBusinessesWithGroq(html, url)
+          console.log(`Extracting businesses with Groq for ${url}...`)
+          let businesses
+          try {
+            businesses = await extractBusinessesWithGroq(html, url)
+            console.log(`Extracted ${businesses.length} businesses from ${url}`)
+          } catch (groqError) {
+            console.error(`Groq extraction failed for ${url}:`, groqError)
+            throw groqError
+          }
           
           urlResult.found = businesses.length
           results.totalFound += businesses.length
@@ -491,7 +624,12 @@ export const handler = async (event, context) => {
       }
     }
   } catch (outerError) {
-    console.error('Handler initialization error:', outerError)
+    console.error('=== Handler outer error ===')
+    console.error('Error type:', outerError?.constructor?.name)
+    console.error('Error message:', outerError?.message)
+    console.error('Error stack:', outerError?.stack)
+    console.error('Full error:', JSON.stringify(outerError, Object.getOwnPropertyNames(outerError)))
+    
     return {
       statusCode: 500,
       headers: {
@@ -500,9 +638,12 @@ export const handler = async (event, context) => {
       },
       body: JSON.stringify({
         error: 'Function initialization error',
-        message: outerError.message || 'Unknown error occurred',
+        message: outerError?.message || 'Unknown error occurred',
+        type: outerError?.constructor?.name || 'Unknown',
       }),
     }
+  } finally {
+    console.log('=== scrape-directories handler finished ===')
   }
 }
 
