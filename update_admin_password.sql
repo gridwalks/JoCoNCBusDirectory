@@ -24,3 +24,4 @@ WHERE "username" = 'admin';
 -- password_length: 60
 -- hash_prefix: $2a$10$
 
+

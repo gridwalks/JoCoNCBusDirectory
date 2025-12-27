@@ -30,3 +30,4 @@ SET
 -- Verify admin user was created
 SELECT "id", "username", "email", "role", "createdAt" FROM "User" WHERE "username" = 'admin';
 
+

@@ -102,3 +102,4 @@ Check the Netlify function logs:
 2. Click on a function (e.g., `auth-login`)
 3. Check the **Logs** tab for error messages
 
+

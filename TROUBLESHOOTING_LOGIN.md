@@ -112,3 +112,4 @@ SELECT "username", "role", LENGTH("password") as pwd_len FROM "User" WHERE "user
 3. Make sure you ran `setup_database.sql` first to create all tables
 4. Try the quick fix SQL in Step 5
 
+

@@ -57,3 +57,4 @@ function MapView({ businesses, onBusinessClick }) {
 
 export default MapView
 
+

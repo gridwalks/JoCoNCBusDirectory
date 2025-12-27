@@ -46,3 +46,4 @@ SET
 WHERE "username" = 'admin'
 RETURNING "id", "username", "email", "role";
 
+

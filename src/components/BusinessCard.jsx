@@ -52,3 +52,4 @@ function BusinessCard({ business }) {
 
 export default BusinessCard
 
+

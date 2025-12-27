@@ -74,3 +74,4 @@ DROP TABLE IF EXISTS "User" CASCADE;
 
 Then run `setup_database.sql` again.
 
+
