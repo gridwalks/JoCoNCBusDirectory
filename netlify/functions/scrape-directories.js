@@ -43,26 +43,34 @@ async function fetchHtml(url) {
   
   if (needsPuppeteer(fullUrl)) {
     // Use Puppeteer for dynamic/JS-rendered pages
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-    })
-    
+    let browser = null
     try {
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+      })
+      
       const page = await browser.newPage()
-      await page.goto(fullUrl, { waitUntil: 'networkidle2', timeout: 30000 })
+      await page.goto(fullUrl, { waitUntil: 'networkidle2', timeout: 20000 })
       const html = await page.content()
       await browser.close()
+      browser = null
       return html
     } catch (error) {
-      await browser.close()
+      if (browser) {
+        try {
+          await browser.close()
+        } catch (closeError) {
+          console.error('Error closing browser:', closeError)
+        }
+      }
       throw new Error(`Failed to fetch with Puppeteer: ${error.message}`)
     }
   } else {
     // Use Cheerio for static pages
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 25000)
+    const timeoutId = setTimeout(() => controller.abort(), 20000)
     
     try {
       const response = await fetch(fullUrl, {
@@ -93,10 +101,15 @@ async function fetchHtml(url) {
  * Extract businesses using Groq AI
  */
 async function extractBusinessesWithGroq(html, url) {
-  const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  
   if (!process.env.GROQ_API_KEY) {
     throw new Error('GROQ_API_KEY environment variable is not set')
+  }
+
+  let client
+  try {
+    client = new Groq({ apiKey: process.env.GROQ_API_KEY })
+  } catch (error) {
+    throw new Error(`Failed to initialize Groq client: ${error.message}`)
   }
   
   // Load HTML and extract text content
@@ -122,10 +135,18 @@ Raw HTML content: ${truncatedContent}`
         }
       ],
       temperature: 0.1,
-      max_tokens: 2000,
+      max_tokens: 2000
     })
 
+    if (!completion || !completion.choices || !completion.choices[0] || !completion.choices[0].message) {
+      throw new Error('Invalid response from Groq API')
+    }
+
     const responseText = completion.choices[0].message.content
+    
+    if (!responseText) {
+      throw new Error('Empty response from Groq API')
+    }
     
     // Try to extract JSON from the response (might be wrapped in markdown code blocks)
     let jsonText = responseText.trim()
@@ -137,7 +158,14 @@ Raw HTML content: ${truncatedContent}`
     }
     
     // Parse JSON
-    const businesses = JSON.parse(jsonText)
+    let businesses
+    try {
+      businesses = JSON.parse(jsonText)
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      console.error('Response text:', jsonText.substring(0, 500))
+      throw new Error(`Failed to parse JSON from Groq response: ${parseError.message}`)
+    }
     
     if (!Array.isArray(businesses)) {
       throw new Error('Groq response is not an array')
@@ -150,6 +178,9 @@ Raw HTML content: ${truncatedContent}`
     }))
   } catch (error) {
     console.error('Groq extraction error:', error)
+    if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
+      throw new Error(`Groq API request timed out: ${error.message}`)
+    }
     throw new Error(`Failed to extract businesses with Groq: ${error.message}`)
   }
 }
@@ -231,6 +262,11 @@ async function processBusiness(businessData, defaultCategoryId, url) {
 }
 
 export const handler = async (event, context) => {
+  const startTime = Date.now()
+  // Netlify functions timeout is 60 seconds, but we'll use 55 seconds as a safety margin
+  const MAX_EXECUTION_TIME = 55000 // 55 seconds in milliseconds
+  const TIME_BUFFER = 5000 // 5 seconds buffer before timeout
+
   try {
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
@@ -307,11 +343,32 @@ export const handler = async (event, context) => {
         totalDuplicates: 0,
         totalErrors: 0,
         urlResults: [],
-        errors: []
+        errors: [],
+        partial: false,
+        processedUrls: 0
+      }
+
+      // Helper function to check if we're running out of time
+      const checkTimeRemaining = () => {
+        const elapsed = Date.now() - startTime
+        return elapsed < (MAX_EXECUTION_TIME - TIME_BUFFER)
       }
 
       // Process each URL
-      for (const url of urls) {
+      for (let i = 0; i < urls.length; i++) {
+        const url = urls[i]
+        
+        // Check if we're running out of time
+        if (!checkTimeRemaining()) {
+          console.log(`Timeout approaching, stopping after ${i} URLs`)
+          results.partial = true
+          results.errors.push({
+            url: 'Timeout',
+            error: `Function timeout approaching. Processed ${i} of ${urls.length} URLs. Please try with fewer URLs or process in batches.`
+          })
+          break
+        }
+
         const urlResult = {
           url,
           found: 0,
@@ -321,8 +378,23 @@ export const handler = async (event, context) => {
         }
 
         try {
-          // Fetch HTML
+          console.log(`Processing URL ${i + 1}/${urls.length}: ${url}`)
+          
+          // Fetch HTML with timeout protection
           const html = await fetchHtml(url)
+          
+          // Check time again after fetching
+          if (!checkTimeRemaining()) {
+            console.log(`Timeout after fetching HTML for ${url}`)
+            urlResult.errors.push({
+              business: 'URL processing',
+              error: 'Timeout after fetching HTML'
+            })
+            results.totalErrors++
+            results.urlResults.push(urlResult)
+            results.partial = true
+            break
+          }
           
           // Extract businesses with Groq
           const businesses = await extractBusinessesWithGroq(html, url)
@@ -330,8 +402,25 @@ export const handler = async (event, context) => {
           urlResult.found = businesses.length
           results.totalFound += businesses.length
 
-          // Process each business
-          for (const business of businesses) {
+          // Process each business (limit to prevent timeout)
+          const maxBusinessesPerUrl = 50 // Limit businesses per URL to prevent timeout
+          const businessesToProcess = businesses.slice(0, maxBusinessesPerUrl)
+          
+          if (businesses.length > maxBusinessesPerUrl) {
+            urlResult.errors.push({
+              business: 'Processing limit',
+              error: `Only processing first ${maxBusinessesPerUrl} of ${businesses.length} businesses to prevent timeout`
+            })
+          }
+
+          for (const business of businessesToProcess) {
+            // Check time before processing each business
+            if (!checkTimeRemaining()) {
+              console.log(`Timeout while processing businesses for ${url}`)
+              results.partial = true
+              break
+            }
+
             const processResult = await processBusiness(business, defaultCategoryId, url)
             
             if (processResult.saved) {
@@ -349,8 +438,8 @@ export const handler = async (event, context) => {
             }
           }
 
-          // Add delay between URLs to avoid rate limiting
-          if (urls.indexOf(url) < urls.length - 1) {
+          // Add delay between URLs to avoid rate limiting (only if not last URL and not timing out)
+          if (i < urls.length - 1 && checkTimeRemaining()) {
             await new Promise(resolve => setTimeout(resolve, 2000))
           }
         } catch (error) {
@@ -367,6 +456,7 @@ export const handler = async (event, context) => {
         }
 
         results.urlResults.push(urlResult)
+        results.processedUrls = i + 1
       }
 
       return {

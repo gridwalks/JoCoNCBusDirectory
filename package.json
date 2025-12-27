@@ -12,6 +12,7 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "node prisma/seed.js",
+    "db:reset": "node scripts/reset-database.js",
     "postinstall": "prisma generate"
   },
   "prisma": {

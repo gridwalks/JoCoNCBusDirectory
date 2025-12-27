@@ -10,7 +10,35 @@ Error code: P2022
 
 This means your database tables don't match your Prisma schema. The database is missing columns (or entire tables).
 
-## Solution: Create and Run Migrations
+## Quick Solution: Use the Reset Script (Recommended)
+
+The easiest way to fix this is to use the provided reset script:
+
+**On Windows (PowerShell):**
+```powershell
+# Set the environment variable
+$env:NETLIFY_DATABASE_URL="paste-your-connection-string-here"
+
+# Run the reset script
+npm run db:reset
+```
+
+**On Mac/Linux:**
+```bash
+# Set the environment variable
+export NETLIFY_DATABASE_URL="paste-your-connection-string-here"
+
+# Run the reset script
+npm run db:reset
+```
+
+This script will:
+1. ✅ Drop all existing tables
+2. ✅ Recreate tables using Prisma schema
+3. ✅ Seed the database with initial data
+4. ✅ List all created tables
+
+## Manual Solution: Create and Run Migrations
 
 ### Step 1: Get Your Database Connection String
 

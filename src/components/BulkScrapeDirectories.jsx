@@ -67,6 +67,12 @@ function BulkScrapeDirectories({ categories, onBusinessesScraped }) {
           Enter multiple directory URLs (one per line) to automatically extract and save businesses using AI.
           The system will extract all businesses from each directory page.
         </p>
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-md mb-4">
+          <p className="text-sm">
+            <strong>Note:</strong> Due to function timeout limits, it's recommended to process 1-3 URLs at a time. 
+            If you have many URLs, process them in batches.
+          </p>
+        </div>
 
         <form onSubmit={handleScrape} className="space-y-4">
           <div>
@@ -136,10 +142,22 @@ function BulkScrapeDirectories({ categories, onBusinessesScraped }) {
             </button>
           </div>
 
+          {results.partial && (
+            <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-md">
+              <p className="font-medium">⚠️ Partial Results</p>
+              <p className="text-sm mt-1">
+                The function timed out after processing {results.processedUrls || results.urlResults.length} of {results.totalUrls} URLs. 
+                Please try processing fewer URLs at a time or process in batches.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-blue-50 p-4 rounded-lg">
               <p className="text-sm text-gray-600">URLs Processed</p>
-              <p className="text-2xl font-bold text-blue-600">{results.totalUrls}</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {results.processedUrls || results.urlResults.length} / {results.totalUrls}
+              </p>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
               <p className="text-sm text-gray-600">Businesses Found</p>
