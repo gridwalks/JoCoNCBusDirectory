@@ -31,6 +31,8 @@ if (dbUrl) {
   }
 }
 
+// Initialize Prisma Client
+// If this fails, the error will be caught by the handler's outer try-catch
 const prisma = new PrismaClient(prismaConfig)
 
 export default prisma

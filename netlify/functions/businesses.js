@@ -1,47 +1,49 @@
 import prisma from './utils/prisma.js'
 
 export const handler = async (event, context) => {
-  // Handle CORS preflight
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      },
-      body: '',
-    }
-  }
-
-  if (event.httpMethod !== 'GET') {
-    return {
-      statusCode: 405,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    }
-  }
-
-  // Check if database URL is configured
-  if (!process.env.NETLIFY_DATABASE_URL && !process.env.DATABASE_URL) {
-    return {
-      statusCode: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-      body: JSON.stringify({
-        error: 'Database configuration error',
-        message: 'NETLIFY_DATABASE_URL environment variable is not set. Please configure it in Netlify environment variables.',
-      }),
-    }
-  }
-
+  // Wrap everything in try-catch to catch initialization errors
   try {
-    const { category, search } = event.queryStringParameters || {}
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return {
+        statusCode: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        },
+        body: '',
+      }
+    }
+
+    if (event.httpMethod !== 'GET') {
+      return {
+        statusCode: 405,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({ error: 'Method not allowed' }),
+      }
+    }
+
+    // Check if database URL is configured
+    if (!process.env.NETLIFY_DATABASE_URL && !process.env.DATABASE_URL) {
+      return {
+        statusCode: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: 'Database configuration error',
+          message: 'NETLIFY_DATABASE_URL environment variable is not set. Please configure it in Netlify environment variables.',
+        }),
+      }
+    }
+
+    try {
+      const { category, search } = event.queryStringParameters || {}
     
     const where = {}
     
@@ -87,7 +89,7 @@ export const handler = async (event, context) => {
       },
       body: JSON.stringify(businesses),
     }
-  } catch (error) {
+    } catch (error) {
     console.error('Error fetching businesses:', error)
     console.error('Error stack:', error.stack)
     console.error('Error name:', error.name)
@@ -134,11 +136,35 @@ export const handler = async (event, context) => {
         })
       }),
     }
-  } finally {
-    try {
-      await prisma.$disconnect()
-    } catch (disconnectError) {
-      console.error('Error disconnecting Prisma:', disconnectError)
+    } finally {
+      try {
+        await prisma.$disconnect()
+      } catch (disconnectError) {
+        console.error('Error disconnecting Prisma:', disconnectError)
+      }
+    }
+  } catch (outerError) {
+    // Catch any errors during initialization or handler setup
+    console.error('Handler initialization error:', outerError)
+    console.error('Error stack:', outerError.stack)
+    console.error('Error name:', outerError.name)
+    console.error('Error message:', outerError.message)
+    
+    return {
+      statusCode: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({ 
+        error: 'Function initialization error',
+        message: outerError.message || 'Unknown error occurred',
+        type: outerError.name || 'Error',
+        // Include stack in development
+        ...(process.env.NODE_ENV === 'development' && { 
+          stack: outerError.stack 
+        })
+      }),
     }
   }
 }
