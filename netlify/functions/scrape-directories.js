@@ -40,12 +40,75 @@ function needsPuppeteer(url) {
 }
 
 /**
+ * Check if HTML content appears to be a loading placeholder
+ */
+function isPlaceholderContent(html) {
+  const placeholderIndicators = [
+    /loading/i,
+    /please wait/i,
+    /loading secure content/i,
+    /javascript is required/i,
+    /enable javascript/i,
+    /noscript/i,
+    /<body[^>]*>\s*<\/body>/i, // Empty body
+    /<body[^>]*>\s*<script/i, // Body with only scripts
+  ]
+  
+  const bodyText = html.toLowerCase()
+  return placeholderIndicators.some(pattern => pattern.test(bodyText)) || 
+         (bodyText.length < 500 && !bodyText.includes('<div') && !bodyText.includes('<article'))
+}
+
+/**
  * Fetch HTML content from URL
  */
 async function fetchHtml(url) {
   const fullUrl = url.startsWith('http') ? url : `https://${url}`
   
-  if (needsPuppeteer(fullUrl)) {
+  // First, try regular fetch to see if we get actual content (unless URL clearly needs Puppeteer)
+  let usePuppeteer = needsPuppeteer(fullUrl)
+  
+  if (!usePuppeteer) {
+    console.log('Trying regular fetch first for:', fullUrl)
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000)
+      
+      const response = await fetch(fullUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        signal: controller.signal
+      })
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const html = await response.text()
+      
+      // Check if we got actual content or just a placeholder
+      if (!isPlaceholderContent(html)) {
+        console.log('Regular fetch successful, got actual content')
+        return html
+      } else {
+        console.log('Regular fetch returned placeholder content, will try Puppeteer')
+        usePuppeteer = true // Switch to Puppeteer
+      }
+    } catch (fetchError) {
+      if (fetchError.name === 'AbortError') {
+        console.log('Regular fetch timed out, will try Puppeteer')
+      } else {
+        console.log('Regular fetch failed, will try Puppeteer:', fetchError.message)
+      }
+      usePuppeteer = true // Switch to Puppeteer
+    }
+  }
+  
+  // Use Puppeteer for dynamic/JS-rendered pages or if regular fetch returned placeholder
+  if (usePuppeteer) {
     // Use Puppeteer for dynamic/JS-rendered pages
     // Lazy load Chromium and Puppeteer only when needed
     let browser = null
@@ -105,6 +168,7 @@ async function fetchHtml(url) {
       await browser.close()
       browser = null
       
+      console.log('Puppeteer fetch successful, HTML length:', html.length)
       return html
     } catch (error) {
       console.error('Puppeteer error:', error)
@@ -115,53 +179,7 @@ async function fetchHtml(url) {
           console.error('Error closing browser:', closeError)
         }
       }
-      // If Puppeteer fails, try to fall back to fetch (won't work for JS pages, but better than nothing)
-      console.warn('Puppeteer failed, attempting fallback to fetch:', error.message)
-      try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 15000)
-        const response = await fetch(fullUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-          },
-          signal: controller.signal
-        })
-        clearTimeout(timeoutId)
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-        return await response.text()
-      } catch (fallbackError) {
-        throw new Error(`Failed to fetch with Puppeteer: ${error.message}. Fallback also failed: ${fallbackError.message}`)
-      }
-    }
-  } else {
-    // Use Cheerio for static pages
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 20000)
-    
-    try {
-      const response = await fetch(fullUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        },
-        signal: controller.signal
-      })
-      clearTimeout(timeoutId)
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-      
-      return await response.text()
-    } catch (fetchError) {
-      clearTimeout(timeoutId)
-      if (fetchError.name === 'AbortError') {
-        throw new Error('Request timed out while fetching the page')
-      }
-      throw fetchError
+      throw new Error(`Failed to fetch with Puppeteer: ${error.message}`)
     }
   }
 }
