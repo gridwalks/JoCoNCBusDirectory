@@ -92,12 +92,27 @@ export const handler = async (event, context) => {
     console.error('Error stack:', error.stack)
     console.error('Error name:', error.name)
     console.error('Error code:', error.code)
+    console.error('Error message:', error.message)
     
     // Check if it's a database connection error
     const isConnectionError = error.code === 'P1001' || 
-                              error.code === 'P1000' || 
-                              error.message?.includes('connection') ||
-                              error.message?.includes('connect')
+                              error.code === 'P1000' ||
+                              error.code === 'P1017' ||
+                              error.message?.toLowerCase().includes('connection') ||
+                              error.message?.toLowerCase().includes('connect') ||
+                              error.message?.toLowerCase().includes('timeout')
+    
+    // Determine user-friendly error message
+    let userMessage = error.message || 'Unknown error occurred'
+    if (error.code === 'P1001') {
+      userMessage = 'Cannot reach database server. Please check your database connection string and ensure the database is running.'
+    } else if (error.code === 'P1000') {
+      userMessage = 'Database authentication failed. Please check your database credentials.'
+    } else if (error.code === 'P1017') {
+      userMessage = 'Database connection was closed. Please try again.'
+    } else if (error.message?.includes('does not exist')) {
+      userMessage = 'Database tables do not exist. Please run database migrations.'
+    }
     
     return {
       statusCode: 500,
@@ -107,11 +122,16 @@ export const handler = async (event, context) => {
       },
       body: JSON.stringify({ 
         error: 'Failed to fetch businesses',
-        message: error.message,
+        message: userMessage,
         code: error.code,
         isConnectionError,
+        // Include original error message for debugging
+        originalMessage: error.message,
         // Only include detailed error in development
-        ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+        ...(process.env.NODE_ENV === 'development' && { 
+          stack: error.stack,
+          fullError: error.toString()
+        })
       }),
     }
   } finally {

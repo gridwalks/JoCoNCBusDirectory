@@ -150,12 +150,27 @@ function Admin() {
       setCategories(categoriesRes.data)
     } catch (error) {
       console.error('Failed to load admin data:', error)
-      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Unknown error'
-      console.error('Error details:', errorMessage)
+      console.error('Full error object:', error)
+      console.error('Error response:', error.response)
+      console.error('Error response data:', error.response?.data)
+      
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          'Unknown error'
+      
+      // Show more detailed error information
+      const errorDetails = error.response?.data
+      const fullErrorMsg = errorDetails 
+        ? `${errorMessage}${errorDetails.code ? ` (Code: ${errorDetails.code})` : ''}${errorDetails.isConnectionError ? ' - Database connection issue' : ''}`
+        : errorMessage
+      
+      console.error('Error details:', fullErrorMsg)
+      
       if (error.response?.status === 401) {
         handleLogout()
       } else {
-        alert(`Failed to load admin data: ${errorMessage}`)
+        alert(`Failed to load admin data: ${fullErrorMsg}`)
       }
     }
   }
