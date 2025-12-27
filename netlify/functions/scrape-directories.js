@@ -181,24 +181,97 @@ async function extractBusinessesWithGroq(html, url) {
     throw new Error(`Failed to initialize Groq client: ${error.message}`)
   }
   
-  // Load HTML and extract text content
+  // Load HTML and extract content with better structure preservation
   const $ = cheerio.load(html)
-  const bodyText = $('body').text()
   
-  // Truncate to ~8000 characters to stay within token limits
-  const truncatedContent = bodyText.substring(0, 8000)
+  // Remove script, style, and other non-content elements
+  $('script, style, noscript, iframe, svg').remove()
   
-  const prompt = `Extract all Johnston County businesses from this directory page. Return ONLY a valid JSON array, no explanatory text.
+  // Try to find business listing containers (common patterns)
+  let contentText = ''
+  
+  // Look for common directory listing patterns
+  const listingSelectors = [
+    '.business-listing', '.listing', '.business', '.directory-item',
+    '.member', '.company', '.organization', '[class*="business"]',
+    '[class*="listing"]', '[class*="directory"]', '[class*="member"]',
+    'article', '.card', '.item', 'li[class*="business"]'
+  ]
+  
+  let foundListings = false
+  for (const selector of listingSelectors) {
+    const elements = $(selector)
+    if (elements.length > 0) {
+      console.log(`Found ${elements.length} potential business listings with selector: ${selector}`)
+      elements.each((i, elem) => {
+        const text = $(elem).text().trim()
+        if (text.length > 20) { // Only include substantial content
+          contentText += text + '\n\n'
+        }
+      })
+      if (contentText.length > 100) {
+        foundListings = true
+        break
+      }
+    }
+  }
+  
+  // If no specific listings found, extract from main content areas
+  if (!foundListings || contentText.length < 100) {
+    console.log('No specific listings found, extracting from main content areas')
+    // Try main content areas
+    const mainContent = $('main, .main, .content, #content, .container, .directory, .listings').first()
+    if (mainContent.length > 0) {
+      contentText = mainContent.text()
+    } else {
+      // Fallback to body text
+      contentText = $('body').text()
+    }
+  }
+  
+  // Clean up: remove excessive whitespace but preserve line breaks
+  contentText = contentText
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .replace(/\n\s*\n\s*\n/g, '\n\n') // Replace multiple newlines with double newline
+    .trim()
+  
+  // Truncate to ~12000 characters to stay within token limits but get more content
+  let truncatedContent = contentText.substring(0, 12000)
+  
+  console.log(`Extracted ${truncatedContent.length} characters of content for Groq analysis`)
+  console.log(`Content sample (first 500 chars): ${truncatedContent.substring(0, 500)}`)
+  if (truncatedContent.length < 100) {
+    console.warn('Warning: Very little content extracted from HTML. The page might be JavaScript-rendered or have a different structure.')
+    // If content is too short, try sending raw HTML structure instead
+    const $2 = cheerio.load(html)
+    $2('script, style, noscript, iframe, svg').remove()
+    const rawStructure = $2('body').html() || ''
+    if (rawStructure.length > truncatedContent.length) {
+      console.log('Trying raw HTML structure instead...')
+      truncatedContent = rawStructure.substring(0, 12000)
+    }
+  }
 
-Required format: [{"name": "", "address": "", "phone": "", "website": "", "email": "", "description": ""}]
+  const prompt = `You are extracting business listings from a directory page. Analyze the content below and extract ALL businesses you can find.
 
-Rules:
-- Only include businesses with valid names and addresses
-- If a field is not available, use an empty string
-- Return ONLY the JSON array, no other text
-- If no businesses are found, return an empty array: []
+IMPORTANT: Return ONLY a valid JSON array. No explanatory text before or after the JSON.
 
-Raw HTML content: ${truncatedContent}`
+Required JSON format:
+[{"name": "Business Name", "address": "Full Address", "phone": "Phone Number", "website": "URL", "email": "Email", "description": "Description"}]
+
+Extraction rules:
+1. Look for business names, addresses, phone numbers, websites, and emails
+2. A business must have at least a name to be included
+3. Address can be partial (city/state is acceptable if full address isn't available)
+4. If a field is missing, use an empty string ""
+5. Extract businesses even if some fields are missing
+6. Look for patterns like: business name, followed by address, phone, etc.
+7. Return an empty array [] ONLY if you find absolutely no businesses
+
+Directory page content:
+${truncatedContent}
+
+Return the JSON array now:`
 
   try {
     const completion = await client.chat.completions.create({
@@ -210,7 +283,7 @@ Raw HTML content: ${truncatedContent}`
         }
       ],
       temperature: 0.1,
-      max_tokens: 2000
+      max_tokens: 4000 // Increased to handle more businesses
     })
 
     if (!completion || !completion.choices || !completion.choices[0] || !completion.choices[0].message) {
