@@ -17,3 +17,6 @@ directory = "netlify/functions"
 
 [functions.scrape-business]
 timeout = 30
+
+[functions.scrape-directories]
+timeout = 60

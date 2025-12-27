@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from './utils/prisma.js'
 import Groq from 'groq-sdk'
 import * as cheerio from 'cheerio'
 import fetch from 'node-fetch'
@@ -9,8 +9,6 @@ import { checkDuplicate } from './utils/duplicate-check.js'
 
 // Schedule: Daily at 2 AM UTC
 export const schedule = '0 2 * * *'
-
-const prisma = new PrismaClient()
 
 /**
  * Determine if URL needs Puppeteer (dynamic/JS) or can use Cheerio (static)

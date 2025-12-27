@@ -1,11 +1,13 @@
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import prisma from './utils/prisma.js'
 
 export const handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
       body: JSON.stringify({ error: 'Method not allowed' }),
     }
   }
@@ -16,6 +18,10 @@ export const handler = async (event, context) => {
     if (!id) {
       return {
         statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
         body: JSON.stringify({ error: 'Business ID is required' }),
       }
     }
@@ -35,6 +41,10 @@ export const handler = async (event, context) => {
     if (!business) {
       return {
         statusCode: 404,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
         body: JSON.stringify({ error: 'Business not found' }),
       }
     }
@@ -51,7 +61,14 @@ export const handler = async (event, context) => {
     console.error('Error fetching business:', error)
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to fetch business' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({ 
+        error: 'Failed to fetch business',
+        message: error.message 
+      }),
     }
   } finally {
     await prisma.$disconnect()

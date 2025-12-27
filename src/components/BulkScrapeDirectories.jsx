@@ -39,8 +39,14 @@ function BulkScrapeDirectories({ categories, onBusinessesScraped }) {
         onBusinessesScraped()
       }
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Failed to scrape directories')
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to scrape directories'
+      setError(errorMessage)
       console.error('Scraping error:', err)
+      console.error('Error details:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message
+      })
     } finally {
       setLoading(false)
     }

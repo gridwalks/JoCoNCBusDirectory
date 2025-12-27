@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from './utils/prisma.js'
 import jwt from 'jsonwebtoken'
 import Groq from 'groq-sdk'
 import * as cheerio from 'cheerio'
@@ -7,8 +7,6 @@ import chromium from '@sparticuz/chromium'
 import puppeteer from 'puppeteer-core'
 import { geocodeAddress, parseAddress } from './utils/geocode.js'
 import { checkDuplicate } from './utils/duplicate-check.js'
-
-const prisma = new PrismaClient()
 
 function verifyToken(event) {
   const authHeader = event.headers.authorization

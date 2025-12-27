@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import prismaDefault from './prisma.js'
 
 // Note: Prisma client should be passed in or created at the function level
 // This utility accepts prisma as a parameter to avoid connection management issues
@@ -7,10 +7,10 @@ import { PrismaClient } from '@prisma/client'
  * Check for duplicate businesses
  * Returns existing business if found, null otherwise
  * @param {Object} businessData - Business data to check
- * @param {PrismaClient} prismaClient - Prisma client instance (optional, creates new if not provided)
+ * @param {PrismaClient} prismaClient - Prisma client instance (optional, uses default if not provided)
  */
 export async function checkDuplicate(businessData, prismaClient = null) {
-  const prisma = prismaClient || new PrismaClient()
+  const prisma = prismaClient || prismaDefault
   const shouldDisconnect = !prismaClient
   
   try {

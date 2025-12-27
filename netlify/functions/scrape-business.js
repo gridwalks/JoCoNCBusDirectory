@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from './utils/prisma.js'
 import jwt from 'jsonwebtoken'
 import { geocodeAddress, parseAddress } from './utils/geocode.js'
 import { checkDuplicate } from './utils/duplicate-check.js'
@@ -6,8 +6,6 @@ import { scrapeGoogleBusiness, isGoogleUrl } from './utils/scrapers/google.js'
 import { scrapeYelpBusiness, isYelpUrl } from './utils/scrapers/yelp.js'
 import { scrapeGeneralWebsite } from './utils/scrapers/general.js'
 import { scrapeDirectoryListing, isDirectoryListing } from './utils/scrapers/directory.js'
-
-const prisma = new PrismaClient()
 
 function verifyToken(event) {
   const authHeader = event.headers.authorization

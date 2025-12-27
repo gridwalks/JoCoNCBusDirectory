@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from './utils/prisma.js'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-
-const prisma = new PrismaClient()
 
 export const handler = async (event, context) => {
   // Handle CORS preflight

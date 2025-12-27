@@ -1,11 +1,13 @@
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import prisma from './utils/prisma.js'
 
 export const handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
       body: JSON.stringify({ error: 'Method not allowed' }),
     }
   }
@@ -16,6 +18,10 @@ export const handler = async (event, context) => {
     if (!q) {
       return {
         statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
         body: JSON.stringify({ error: 'Search query is required' }),
       }
     }
@@ -49,7 +55,14 @@ export const handler = async (event, context) => {
     console.error('Error searching businesses:', error)
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to search businesses' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({ 
+        error: 'Failed to search businesses',
+        message: error.message 
+      }),
     }
   } finally {
     await prisma.$disconnect()

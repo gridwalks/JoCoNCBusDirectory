@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import prisma from './utils/prisma.js'
 
 export const handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
@@ -61,7 +59,14 @@ export const handler = async (event, context) => {
     console.error('Error fetching businesses:', error)
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to fetch businesses' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({ 
+        error: 'Failed to fetch businesses',
+        message: error.message 
+      }),
     }
   } finally {
     await prisma.$disconnect()
