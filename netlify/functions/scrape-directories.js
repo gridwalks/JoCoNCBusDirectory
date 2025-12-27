@@ -188,10 +188,16 @@ async function extractBusinessesWithGroq(html, url) {
   // Truncate to ~8000 characters to stay within token limits
   const truncatedContent = bodyText.substring(0, 8000)
   
-  const prompt = `Extract all Johnston County businesses from this directory page as a JSON array. 
-Format: [{"name": "", "address": "", "phone": "", "website": "", "email": "", "description": ""}]
-Only include businesses with valid names and addresses. 
-If a field is not available, use an empty string.
+  const prompt = `Extract all Johnston County businesses from this directory page. Return ONLY a valid JSON array, no explanatory text.
+
+Required format: [{"name": "", "address": "", "phone": "", "website": "", "email": "", "description": ""}]
+
+Rules:
+- Only include businesses with valid names and addresses
+- If a field is not available, use an empty string
+- Return ONLY the JSON array, no other text
+- If no businesses are found, return an empty array: []
+
 Raw HTML content: ${truncatedContent}`
 
   try {
@@ -217,13 +223,27 @@ Raw HTML content: ${truncatedContent}`
       throw new Error('Empty response from Groq API')
     }
     
-    // Try to extract JSON from the response (might be wrapped in markdown code blocks)
+    // Try to extract JSON from the response
+    // Groq may include explanatory text before/after the JSON
     let jsonText = responseText.trim()
     
-    // Remove markdown code blocks if present
-    if (jsonText.startsWith('```')) {
-      const lines = jsonText.split('\n')
-      jsonText = lines.slice(1, -1).join('\n').replace(/^json\n/, '')
+    // First, try to find JSON in markdown code blocks
+    const codeBlockRegex = /```(?:json)?\s*(\[[\s\S]*?\])\s*```/g
+    const codeBlockMatch = codeBlockRegex.exec(jsonText)
+    if (codeBlockMatch && codeBlockMatch[1]) {
+      jsonText = codeBlockMatch[1].trim()
+    } else {
+      // If no code block, try to find JSON array directly
+      // Look for array pattern: starts with [ and ends with ]
+      const arrayStart = jsonText.indexOf('[')
+      const arrayEnd = jsonText.lastIndexOf(']')
+      
+      if (arrayStart !== -1 && arrayEnd !== -1 && arrayEnd > arrayStart) {
+        jsonText = jsonText.substring(arrayStart, arrayEnd + 1)
+      } else {
+        // Last resort: try parsing the whole thing
+        jsonText = jsonText.trim()
+      }
     }
     
     // Parse JSON
@@ -232,8 +252,21 @@ Raw HTML content: ${truncatedContent}`
       businesses = JSON.parse(jsonText)
     } catch (parseError) {
       console.error('JSON parse error:', parseError)
-      console.error('Response text:', jsonText.substring(0, 500))
-      throw new Error(`Failed to parse JSON from Groq response: ${parseError.message}`)
+      console.error('Response text:', responseText.substring(0, 500))
+      console.error('Extracted JSON text:', jsonText.substring(0, 500))
+      
+      // Try one more time: look for any JSON-like structure
+      const jsonMatch = jsonText.match(/\[[\s\S]*\]/)
+      if (jsonMatch) {
+        try {
+          businesses = JSON.parse(jsonMatch[0])
+          console.log('Successfully parsed JSON after second attempt')
+        } catch (secondParseError) {
+          throw new Error(`Failed to parse JSON from Groq response: ${parseError.message}. Extracted text: ${jsonText.substring(0, 200)}`)
+        }
+      } else {
+        throw new Error(`Failed to parse JSON from Groq response: ${parseError.message}. Response: ${responseText.substring(0, 200)}`)
+      }
     }
     
     if (!Array.isArray(businesses)) {
