@@ -14,7 +14,6 @@ status = 200
 [functions]
 node_bundler = "esbuild"
 directory = "netlify/functions"
-timeout = 30
 
 [functions.scrape-business]
 timeout = 30
