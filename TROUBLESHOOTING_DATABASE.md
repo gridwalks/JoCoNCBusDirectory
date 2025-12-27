@@ -6,14 +6,21 @@
 
 This usually means one of the following:
 
-#### A. Database Tables Don't Exist
+#### A. Database Schema Mismatch (Error P2022: Column doesn't exist)
+**This is the most common issue!** The database tables don't match the Prisma schema.
+
 **Solution:** Run database migrations
 
 1. Get your `NETLIFY_DATABASE_URL` from Netlify Dashboard → Site Settings → Environment Variables
 2. Run migrations locally:
-   ```bash
+
+   **On Windows (PowerShell):**
+   ```powershell
    # Set the environment variable
-   export NETLIFY_DATABASE_URL="your-connection-string-here"
+   $env:NETLIFY_DATABASE_URL="your-connection-string-here"
+   
+   # Verify it's set
+   echo $env:NETLIFY_DATABASE_URL
    
    # Run migrations
    npm run prisma:migrate:deploy
@@ -21,6 +28,23 @@ This usually means one of the following:
    # Seed the database (creates admin user)
    npm run prisma:seed
    ```
+
+   **On Mac/Linux:**
+   ```bash
+   # Set the environment variable
+   export NETLIFY_DATABASE_URL="your-connection-string-here"
+   
+   # Verify it's set
+   echo $NETLIFY_DATABASE_URL
+   
+   # Run migrations
+   npm run prisma:migrate:deploy
+   
+   # Seed the database (creates admin user)
+   npm run prisma:seed
+   ```
+
+3. **Verify:** After running migrations, check your Neon dashboard to confirm all tables were created with the correct columns.
 
 #### B. NETLIFY_DATABASE_URL Not Set in Netlify
 **Solution:** Add the environment variable
@@ -51,6 +75,7 @@ This usually means one of the following:
 4. Look for:
    - `P1001`: Can't reach database server
    - `P1000`: Authentication failed
+   - `P2022`: Column/table doesn't exist (schema mismatch - **run migrations!**)
    - `P2002`: Unique constraint violation
    - `P2025`: Record not found
 

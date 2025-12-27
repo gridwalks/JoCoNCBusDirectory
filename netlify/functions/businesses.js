@@ -112,8 +112,11 @@ export const handler = async (event, context) => {
       userMessage = 'Database authentication failed. Please check your database credentials.'
     } else if (error.code === 'P1017') {
       userMessage = 'Database connection was closed. Please try again.'
+    } else if (error.code === 'P2022') {
+      // Column doesn't exist - schema mismatch
+      userMessage = 'Database schema is out of sync. The database tables do not match the expected schema. Please run database migrations: npm run prisma:migrate:deploy'
     } else if (error.message?.includes('does not exist')) {
-      userMessage = 'Database tables do not exist. Please run database migrations.'
+      userMessage = 'Database tables or columns do not exist. Please run database migrations: npm run prisma:migrate:deploy'
     }
     
     return {
