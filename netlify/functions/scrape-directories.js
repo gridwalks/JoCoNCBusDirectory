@@ -2,7 +2,7 @@ import prisma from './utils/prisma.js'
 import jwt from 'jsonwebtoken'
 import Groq from 'groq-sdk'
 import * as cheerio from 'cheerio'
-import fetch from 'node-fetch'
+// Use native fetch (available in Node 18+) instead of node-fetch to avoid undici compatibility issues
 // Lazy load Chromium and Puppeteer only when needed
 // import chromium from '@sparticuz/chromium'
 // import puppeteer from 'puppeteer-core'
