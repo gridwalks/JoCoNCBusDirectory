@@ -1,3 +1,6 @@
+// Import polyfills FIRST before any other imports to ensure File global is available
+import './utils/polyfills.js'
+
 import prisma from './utils/prisma.js'
 import Groq from 'groq-sdk'
 import * as cheerio from 'cheerio'
